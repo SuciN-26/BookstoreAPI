@@ -6,9 +6,18 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Serilog;
 
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Information()
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File("logs/log.txt", rollingInterval: RollingInterval.Day, retainedFileCountLimit: 5)
+    .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
+
+//Configure Logging with serilog
+builder.Host.UseSerilog();
 
 // Add services to the container.
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -22,16 +31,10 @@ builder.Services.AddMemoryCache();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-//Configure Logging with serilog
-builder.Host.UseSerilog((context, configuration) =>
-{
-    configuration.ReadFrom.Configuration(context.Configuration);
-    configuration.Enrich.FromLogContext();
-});
-
 
 // registration dependencies 
 builder.Services.AddScoped<IBookRepository, BookRepository>();
+builder.Services.AddScoped<IAuthorRepository, AuthorRepository>();
 
 builder.Services.AddScoped<IBookRepository>(provider =>
 {
@@ -52,14 +55,14 @@ if (app.Environment.IsDevelopment())
 }
 
 //Jika error 500
-app.UseExceptionHandler(errorApp =>
-{
-    errorApp.Run(async context =>
-    {
-        context.Response.StatusCode = 500;
-        await context.Response.WriteAsJsonAsync(new { error = "An unexpected error occurred." });
-    });
-});
+//app.UseExceptionHandler(errorApp =>
+//{
+//    errorApp.Run(async context =>
+//    {
+//        context.Response.StatusCode = 500;
+//        await context.Response.WriteAsJsonAsync(new { error = "An unexpected error occurred." });
+//    });
+//});
 
 app.UseHttpsRedirection();
 

@@ -21,6 +21,7 @@ namespace BookstoreInventory.Controllers
         public async Task<IActionResult> GetAll()
         {
             var authors = await _authorRepository.GetAllAsync();
+
             return Ok(authors);
         }
 
