@@ -1,6 +1,9 @@
-﻿using BookstoreInventory.DTOs;
+﻿using AutoMapper;
+using BookstoreInventory.DTOs;
 using BookstoreInventory.Models;
 using BookstoreInventory.Repositories;
+using BookstoreInventory.Utils;
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,30 +14,45 @@ namespace BookstoreInventory.Controllers
     public class BooksController : ControllerBase
     {
         private readonly IBookRepository _bookRepository;
+        private readonly IValidator<CreateBookDto> _bookValidator;
+        private readonly IMapper _mapper;
 
-        public BooksController(IBookRepository bookRepository)
+        public BooksController(IBookRepository bookRepository, IValidator<CreateBookDto> bookValidator, IMapper mapper)
         {
             _bookRepository = bookRepository;
+            _bookValidator = bookValidator;
+            _mapper = mapper;
         }
 
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
             var books = await _bookRepository.GetAllAsync();
-            return Ok(books);
+
+            var bookDtos = _mapper.Map<List<BookDto>>(books);
+            return Ok(bookDtos);
         }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)
         {
             var book = await _bookRepository.GetByIdAsync(id);
-            if (book == null) return NotFound();
-            return Ok(book);
+            if (book == null) new NotFoundException($"Buku dengan Id {id} tidak ditemukan.");
+            
+            var bookDtos = _mapper.Map<BookDto>(book);
+            return Ok(bookDtos);
         }
 
         [HttpPost]
         public async Task<IActionResult> Create(CreateBookDto bookDto)
         {
+            //Checking Validation
+            var bookValidator = await _bookValidator.ValidateAsync(bookDto);
+            if ((!bookValidator.IsValid))
+            {
+                throw new ValidationException(bookValidator.Errors);
+            }
+
             var book = new Book
             {
                 Title = bookDto.Title,
@@ -48,22 +66,30 @@ namespace BookstoreInventory.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(Guid id, CreateBookDto bookDto)
         {
+            //Checking Validation
+            var bookValidator = await _bookValidator.ValidateAsync(bookDto);
+            if ((!bookValidator.IsValid))
+            {
+                throw new ValidationException(bookValidator.Errors);
+            }
+
             var book = await _bookRepository.GetByIdAsync(id);
-            if (book == null) return NotFound();
+            if (book == null) new NotFoundException($"Buku dengan Id {id} tidak ditemukan.");
 
             book.Title = bookDto.Title;
             await _bookRepository.UpdateAsync(book);
-            return NoContent();
+            
+            return Ok(book);
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var book = await _bookRepository.GetByIdAsync(id);
-            if(book == null) return NotFound();
+            if (book == null) new NotFoundException($"Buku dengan Id {id} tidak ditemukan.");
 
             await _bookRepository.DeleteAsync(book);
-            return NoContent();
+            return Ok(id);
         }
 
     }

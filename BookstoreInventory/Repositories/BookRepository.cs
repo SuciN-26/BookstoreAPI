@@ -27,7 +27,7 @@ namespace BookstoreInventory.Repositories
 
         public async Task<IEnumerable<Book>> GetAllAsync()
         {
-            return await _context.Books.Include(b => b.Author).ToListAsync();
+            return await _context.Books.Include(b => b.Author).ThenInclude(a => a.Books).ToListAsync();
         }
 
         public async Task<Book> GetByIdAsync(Guid id)

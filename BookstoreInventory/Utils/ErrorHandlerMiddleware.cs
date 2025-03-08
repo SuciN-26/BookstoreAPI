@@ -1,7 +1,6 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
-using System.ComponentModel.DataAnnotations;
-using FluentValidation;
-using ValidationException = FluentValidation.ValidationException;
+﻿using FluentValidation;
+using System.Net;
+using System.Text.Json;
 
 namespace BookstoreInventory.Utils
 {
@@ -24,50 +23,54 @@ namespace BookstoreInventory.Utils
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, 
+                _logger.LogError(ex,
                     "Terjadi error saat memproses request {Method} {Path}. Error: {Message}",
                     context.Request.Method,
                     context.Request.Path,
                     ex.Message);
 
-
                 await HandleExceptionAsync(context, ex);
             }
         }
 
-        private static Task HandleExceptionAsync(HttpContext context, Exception exception)
+        private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
         {
+            if (context.Response.HasStarted)
+            {
+                // Jika response sudah berjalan, kita tidak bisa menulis response lagi
+                return;
+            }
+
+            var response = context.Response;
+            response.ContentType = "application/json";
+
             int statusCode;
-            string message;
+            object errorResponse;
 
             switch (exception)
             {
                 case NotFoundException:
-                    statusCode = StatusCodes.Status404NotFound;
-                    message = exception.Message;
+                    statusCode = (int)HttpStatusCode.NotFound;
+                    errorResponse = new { status = statusCode, error = exception.Message };
                     break;
 
                 case ValidationException validationEx:
-                    statusCode = StatusCodes.Status400BadRequest;
-                    message = string.Join(", ", validationEx.Errors.Select(e => e.ErrorMessage));
+                    statusCode = (int)HttpStatusCode.BadRequest;
+                    var errors = validationEx.Errors.Select(e => new { e.PropertyName, e.ErrorMessage });
+                    errorResponse = new { status = statusCode, error = "Validation failed.", errors };
                     break;
 
                 default:
-                    statusCode = StatusCodes.Status500InternalServerError;
-                    message = "Terjadi kesalahan pada server.";
+                    statusCode = (int)HttpStatusCode.InternalServerError;
+                    errorResponse = new { status = statusCode, error = "Terjadi kesalahan pada server." };
                     break;
             }
 
-            var result = System.Text.Json.JsonSerializer.Serialize(new
-            {
-                error = message,
-                status = statusCode
-            });
+            response.StatusCode = statusCode;
 
-            context.Response.ContentType = "application/json";
-            context.Response.StatusCode = statusCode;
+            var result = JsonSerializer.Serialize(errorResponse);
 
-            return context.Response.WriteAsync(result);
+            await response.WriteAsync(result);
         }
     }
 }

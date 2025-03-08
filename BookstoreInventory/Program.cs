@@ -1,10 +1,15 @@
 using BookstoreInventory.Caching;
 using BookstoreInventory.Data;
+using BookstoreInventory.DTOs;
 using BookstoreInventory.Repositories;
+using BookstoreInventory.Utils;
+using BookstoreInventory.Validators;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Serilog;
+using System.Text.Json.Serialization;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -24,7 +29,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseLazyLoadingProxies().UseSqlServer(config.GetConnectionString("DefaultConnection"))
 );
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<SuccessResultFilter>();
+}).AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+});
+
 builder.Services.AddMemoryCache();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -34,16 +46,13 @@ builder.Services.AddSwaggerGen();
 
 // registration dependencies 
 builder.Services.AddScoped<IBookRepository, BookRepository>();
+builder.Services.Decorate<IBookRepository, CachedBookService>();
+
 builder.Services.AddScoped<IAuthorRepository, AuthorRepository>();
+builder.Services.AddScoped<IValidator<CreateAuthorDto>, CreateAuthorValidator>();
+builder.Services.AddScoped<IValidator<CreateBookDto>, CreateBookValidator>();
 
-builder.Services.AddScoped<IBookRepository>(provider =>
-{
-    var bookRepo = new BookRepository(provider.GetRequiredService<AppDbContext>());
-
-    var cache = provider.GetRequiredService<IMemoryCache>();
-    
-    return new CachedBookService(bookRepo, cache);
-});
+builder.Services.AddAutoMapper(typeof(Program));
 
 var app = builder.Build();
 
@@ -54,15 +63,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-//Jika error 500
-//app.UseExceptionHandler(errorApp =>
-//{
-//    errorApp.Run(async context =>
-//    {
-//        context.Response.StatusCode = 500;
-//        await context.Response.WriteAsJsonAsync(new { error = "An unexpected error occurred." });
-//    });
-//});
+app.UseMiddleware<ErrorHandlerMiddleware>();
+
 
 app.UseHttpsRedirection();
 
