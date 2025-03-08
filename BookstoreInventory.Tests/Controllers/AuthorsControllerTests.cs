@@ -4,6 +4,7 @@ using BookstoreInventory.DTOs;
 using BookstoreInventory.Models;
 using BookstoreInventory.Repositories;
 using FluentValidation;
+using FluentValidation.Results;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
 using System;
@@ -68,6 +69,47 @@ namespace BookstoreInventory.Tests.Controllers
             Assert.Equal(2, ((List<AuthorDto>)response.Data).Count);
             Assert.Equal(totalCount, response.TotalItems);
             Assert.Equal(4, response.TotalPages); // 7 total / 2 per halaman = 4 halaman
+        }
+
+        // POST /api/authors (Menambahkan Penulis Baru)
+        [Fact]
+        public async Task Create_ValidAuthor_ShouldReturnCreatedResponse()
+        {
+            // Arrange
+            var authorDto = new CreateAuthorDto { Name = "New Author" };
+            var validationResult = new ValidationResult();
+
+            _validatorMock.Setup(v => v.ValidateAsync(authorDto, default)).ReturnsAsync(validationResult);
+            _authorRepoMock.Setup(repo => repo.AddAsync(It.IsAny<Author>())).Returns(Task.CompletedTask);
+
+            // Act
+            var result = await _controller.Create(authorDto);
+
+            // Assert
+            var createdResult = Assert.IsType<CreatedAtActionResult>(result);
+            var returnedAuthor = Assert.IsType<Author>(createdResult.Value);
+            Assert.Equal(authorDto.Name, returnedAuthor.Name);
+        }
+
+        [Fact]
+        public async Task Create_InvalidAuthor_ShouldReturnBadRequest()
+        {
+            // Arrange
+            var authorDto = new CreateAuthorDto { Name = "" }; // Invalid karena kosong
+            var validationResult = new ValidationResult(new List<ValidationFailure>
+            {
+                new ValidationFailure("Name", "Name is required")
+            });
+
+            _validatorMock.Setup(v => v.ValidateAsync(authorDto, default)).ReturnsAsync(validationResult);
+
+            // Act
+            var result = await _controller.Create(authorDto);
+
+            // Assert
+            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+            var errorMessages = Assert.IsType<List<string>>(badRequestResult.Value);
+            Assert.Contains("Name is required", errorMessages);
         }
 
     }
