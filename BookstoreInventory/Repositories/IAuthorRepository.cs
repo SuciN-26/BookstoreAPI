@@ -1,10 +1,11 @@
-﻿using BookstoreInventory.Models;
+﻿using BookstoreInventory.DTOs;
+using BookstoreInventory.Models;
 
 namespace BookstoreInventory.Repositories
 {
     public interface IAuthorRepository
     {
-        Task<IEnumerable<Author>> GetAllAsync();
+        Task<PagedResultDto<Author>> GetAllAsync(int page, int pageSize);
         Task<Author> GetByIdAsync(Guid id);
         Task AddAsync(Author author);
         Task UpdateAsync(Author author);

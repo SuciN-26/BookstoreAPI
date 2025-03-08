@@ -25,12 +25,22 @@ namespace BookstoreInventory.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(int page = 1, int pageSize = 10)
         {
-            var authors = await _authorRepository.GetAllAsync();
+            var pagedAuthors = await _authorRepository.GetAllAsync(page, pageSize);
 
-            var authorDtos = _mapper.Map<List<AuthorDto>>(authors);
-            return Ok(authorDtos);
+            var authorDtos = _mapper.Map<List<AuthorDto>>(pagedAuthors.Data);
+
+            var result = new PagedResultDto<AuthorDto>
+            {
+                Data = authorDtos,
+                CurrentPage = pagedAuthors.CurrentPage,
+                PageSize = pagedAuthors.PageSize,
+                TotalItems = pagedAuthors.TotalItems,
+                TotalPages = pagedAuthors.TotalPages
+            };
+
+            return Ok(result);
         }
 
         [HttpGet("{id}")]

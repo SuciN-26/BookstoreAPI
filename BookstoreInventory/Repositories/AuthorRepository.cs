@@ -1,5 +1,7 @@
 ﻿using BookstoreInventory.Data;
+using BookstoreInventory.DTOs;
 using BookstoreInventory.Models;
+using BookstoreInventory.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace BookstoreInventory.Repositories
@@ -25,9 +27,13 @@ namespace BookstoreInventory.Repositories
             await _context.SaveChangesAsync();
         }
 
-        public async Task<IEnumerable<Author>> GetAllAsync()
+        public async Task<PagedResultDto<Author>> GetAllAsync(int page, int pageSize)
         {
-            return await _context.Authors.ToListAsync();
+            return await _context.Authors
+                        .Include(a => a.Books)
+                        .OrderBy(a => a.Name)
+                        .AsQueryable()
+                        .ToPagedResultAsync(page, pageSize);
         }
 
         public async Task<Author> GetByIdAsync(Guid id)
